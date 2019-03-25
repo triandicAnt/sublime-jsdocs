@@ -13,6 +13,7 @@ import datetime
 import time
 import imp
 from functools import reduce
+<<<<<<< HEAD
 apex = 'Packages/MavensMate/sublime/lang/Apex.sublime-syntax'
 java = 'Packages/Java/Java.sublime-syntax'
 
@@ -31,6 +32,8 @@ def get_symbols(view):
     view.set_syntax_file(apex) # set syntax back to Apex
     return all_methods
 
+=======
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 
 def read_line(view, point):
     if (point >= view.size()):
@@ -47,6 +50,10 @@ def write(view, str):
         }
     )
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 def counter():
     count = 0
     while True:
@@ -163,6 +170,7 @@ def getDocBlockRegion(view, point):
 
     return sublime.Region(start, end)
 
+<<<<<<< HEAD
 class GenerateCommentsCommand(sublime_plugin.TextCommand):
     def run(self, edit, inline=False):
         size_dict = 0
@@ -183,6 +191,13 @@ class JsdocsCommand(sublime_plugin.TextCommand):
 
     def run(self, edit, cmd_view, cmd_point=None, inline=False):
         self.initialize(self.view, cmd_point, inline)
+=======
+class JsdocsCommand(sublime_plugin.TextCommand):
+
+    def run(self, edit, inline=False):
+
+        self.initialize(self.view, inline)
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 
         if self.parser.isExistingComment(self.line):
             write(self.view, "\n *" + self.indentSpaces)
@@ -195,6 +210,7 @@ class JsdocsCommand(sublime_plugin.TextCommand):
         out = self.parser.parse(self.line)
 
         snippet = self.generateSnippet(out, inline)
+<<<<<<< HEAD
         if not cmd_point:
             write(self.view, snippet)
         else:
@@ -219,6 +235,13 @@ class JsdocsCommand(sublime_plugin.TextCommand):
 
     def initialize(self, v, cmd_point=None, inline=False):
         point = cmd_point if cmd_point else v.sel()[0].end()
+=======
+
+        write(self.view, snippet)
+
+    def initialize(self, v, inline=False):
+        point = v.sel()[0].end()
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 
         self.settings = v.settings()
 
@@ -412,7 +435,12 @@ class JsdocsParser(object):
             out = self.parseFunction(line)  # (name, args, retval, options)
             if (out):
                 return self.formatFunction(*out)
+<<<<<<< HEAD
             out = self.x(line)
+=======
+
+            out = self.parseVar(line)
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
             if out:
                 return self.formatVar(*out)
         except:
@@ -465,7 +493,11 @@ class JsdocsParser(object):
 
         extraTagAfter = self.viewSettings.get("jsdocs_extra_tags_go_after") or False
 
+<<<<<<< HEAD
         description = self.getNameOverride() or ('@description [%s%sdescription]' % (escape(name), ' ' if name else ''))
+=======
+        description = self.getNameOverride() or ('[%s%sdescription]' % (escape(name), ' ' if name else ''))
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
         if self.viewSettings.get('jsdocs_function_description'):
             out.append("${1:%s}" % description)
 
@@ -648,6 +680,547 @@ class JsdocsParser(object):
         return definition
 
 
+<<<<<<< HEAD
+=======
+class JsdocsJavascript(JsdocsParser):
+    def setupSettings(self):
+        identifier = '[a-zA-Z_$][a-zA-Z_$0-9]*'
+        self.settings = {
+            # curly brackets around the type information
+            "curlyTypes": True,
+            'typeInfo': True,
+            "typeTag": self.viewSettings.get('jsdocs_override_js_var') or "type",
+            # technically, they can contain all sorts of unicode, but w/e
+            "varIdentifier": identifier,
+            "fnIdentifier":  identifier,
+            "fnOpener": '(?:'
+                    + r'function[\s*]*(?:' + identifier + r')?\s*\('
+                    + '|'
+                    + '(?:' + identifier + r'|\(.*\)\s*=>)'
+                    + '|'
+                    + '(?:' + identifier + r'\s*\(.*\)\s*\{)'
+                    + ')',
+            "commentCloser": " */",
+            "bool": "Boolean",
+            "function": "Function"
+        }
+
+    def parseFunction(self, line):
+        res = re.search(
+            # Normal functions...
+            #   fnName = function,  fnName : function
+            r'(?:(?P<name1>' + self.settings['varIdentifier'] + r')\s*[:=]\s*)?'
+            + 'function'
+            # function fnName, function* fnName
+            + r'(?P<generator>[\s*]+)?(?P<name2>' + self.settings['fnIdentifier'] + ')?'
+            # (arg1, arg2)
+            + r'\s*\(\s*(?P<args>.*)\)',
+            line
+        ) or re.search(
+            # ES6 arrow functions
+            # () => y,  x => y,  (x, y) => y,  (x = 4) => y
+            r'(?:(?P<args>' + self.settings['varIdentifier'] + r')|\(\s*(?P<args2>.*)\))\s*=>',
+            line
+        ) or re.search(
+            # ES6 method initializer shorthand
+            # var person = { getName() { return this.name; } }
+            r'(?P<name1>' + self.settings['varIdentifier'] + ')\s*\((?P<args>.*)\)\s*\{',
+            line
+        )
+        if not res:
+            return None
+
+        groups = {
+            'name1': '',
+            'name2': '',
+            'generator': '',
+            'args': '',
+            'args2': ''
+        }
+        groups.update(res.groupdict())
+        # grab the name out of "name1 = function name2(foo)" preferring name1
+        generatorSymbol = '*' if (groups['generator'] or '').find('*') > -1 else ''
+        name = generatorSymbol + (groups['name1'] or groups['name2'] or '')
+        args = groups['args'] or groups['args2'] or ''
+
+        return (name, args, None)
+
+    def parseVar(self, line):
+        res = re.search(
+            #   var foo = blah,
+            #       foo = blah;
+            #   baz.foo = blah;
+            #   baz = {
+            #        foo : blah
+            #   }
+
+            '(?P<name>' + self.settings['varIdentifier'] + ')\s*[=:]\s*(?P<val>.*?)(?:[;,]|$)',
+            line
+        )
+        if not res:
+            return None
+
+        return (res.group('name'), res.group('val').strip())
+
+    def getArgInfo(self, arg):
+        if (re.search('^\{.*\}$', arg)):
+            subItems = splitByCommas(arg[1:-1])
+            prefix = 'options.'
+        else:
+            subItems = [arg]
+            prefix = ''
+
+        out = []
+        for subItem in subItems:
+            out.append((self.getArgType(subItem), prefix + self.getArgName(subItem)))
+
+        return out
+
+    def getArgType(self, arg):
+        parts = re.split(r'\s*=\s*', arg, 1)
+        # rest parameters
+        if parts[0].find('...') == 0:
+            return '...[type]'
+        elif len(parts) > 1:
+            return self.guessTypeFromValue(parts[1])
+
+    def getArgName(self, arg):
+        namePart = re.split(r'\s*=\s*', arg, 1)[0]
+
+        # check for rest parameters, eg: function (foo, ...rest) {}
+        if namePart.find('...') == 0:
+            return namePart[3:]
+        return namePart
+
+    def getFunctionReturnType(self, name, retval):
+        if name and name[0] == '*':
+            return None
+        return super(JsdocsJavascript, self).getFunctionReturnType(name, retval)
+
+    def getMatchingNotations(self, name):
+        out = super(JsdocsJavascript, self).getMatchingNotations(name)
+        if name and name[0] == '*':
+            # if '@returns' is preferred, then also use '@yields'. Otherwise, '@return' and '@yield'
+            yieldTag = '@yield' + ('s' if self.viewSettings.get('jsdocs_return_tag', '_')[-1] == 's' else '')
+            description = ' ${1:[description]}' if self.viewSettings.get('jsdocs_return_description', True) else ''
+            out.append({ 'tags': [
+                '%s {${1:[type]}}%s' % (yieldTag, description)
+            ]})
+        return out
+
+    def guessTypeFromValue(self, val):
+        lowerPrimitives = self.viewSettings.get('jsdocs_lower_case_primitives') or False
+        shortPrimitives = self.viewSettings.get('jsdocs_short_primitives') or False
+        if is_numeric(val):
+            return "number" if lowerPrimitives else "Number"
+        if val[0] == '"' or val[0] == "'":
+            return "string" if lowerPrimitives else "String"
+        if val[0] == '[':
+            return "Array"
+        if val[0] == '{':
+            return "Object"
+        if val == 'true' or val == 'false':
+            returnVal = 'Bool' if shortPrimitives else 'Boolean'
+            return returnVal.lower() if lowerPrimitives else returnVal
+        if re.match('RegExp\\b|\\/[^\\/]', val):
+            return 'RegExp'
+        if val.find('=>') > -1:
+            return 'function' if lowerPrimitives else 'Function'
+        if val[:4] == 'new ':
+            res = re.search('new (' + self.settings['fnIdentifier'] + ')', val)
+            return res and res.group(1) or None
+        return None
+
+
+class JsdocsPHP(JsdocsParser):
+    def setupSettings(self):
+        shortPrimitives = self.viewSettings.get('jsdocs_short_primitives') or False
+        nameToken = '[a-zA-Z_\\x7f-\\xff][a-zA-Z0-9_\\x7f-\\xff]*'
+        self.settings = {
+            # curly brackets around the type information
+            'curlyTypes': False,
+            'typeInfo': True,
+            'typeTag': "var",
+            'varIdentifier': '&?[$]' + nameToken + '(?:->' + nameToken + ')*',
+            'fnIdentifier': nameToken,
+            'typeIdentifier': '\\\\?' + nameToken + '(\\\\' + nameToken + ')*',
+            'fnOpener': 'function(?:\\s+' + nameToken + ')?\\s*\\(',
+            'commentCloser': ' */',
+            'bool': 'bool' if shortPrimitives else 'boolean',
+            'function': "function"
+        }
+
+    def parseFunction(self, line):
+        res = re.search(
+            'function\\s+&?\\s*'
+            + '(?P<name>' + self.settings['fnIdentifier'] + ')'
+            # function fnName
+            # (arg1, arg2)
+            + '\\s*\\(\\s*(?P<args>.*)\\)',
+            line
+        )
+        if not res:
+            return None
+
+        return (res.group('name'), res.group('args'), None)
+
+    def getArgType(self, arg):
+
+        res = re.search(
+            '(?P<type>' + self.settings['typeIdentifier'] + ')?'
+            + '\\s*(?P<name>' + self.settings['varIdentifier'] + ')'
+            + '(\\s*=\\s*(?P<val>.*))?',
+            arg
+        );
+
+        if (res):
+
+            argType = res.group("type")
+            argName = res.group("name")
+            argVal = res.group("val")
+
+            # function fnc_name(type $name = val)
+            if (argType and argVal):
+
+                # function fnc_name(array $x = array())
+                # function fnc_name(array $x = [])
+                argValType = self.guessTypeFromValue(argVal)
+                if argType == argValType:
+                    return argType
+
+                # function fnc_name(type $name = null)
+                return argType + "|" + argValType
+
+            # function fnc_name(type $name)
+            if (argType):
+                return argType
+
+            # function fnc_name($name = value)
+            if (argVal):
+                guessedType = self.guessTypeFromValue(argVal)
+                return guessedType if guessedType != 'null' else None
+        # function fnc_name()
+        return None
+
+    def getArgName(self, arg):
+        return re.search("(" + self.settings['varIdentifier'] + ")(?:\\s*=.*)?$", arg).group(1)
+
+    def parseVar(self, line):
+        res = re.search(
+            #   var $foo = blah,
+            #       $foo = blah;
+            #   $baz->foo = blah;
+            #   $baz = array(
+            #        'foo' => blah
+            #   )
+
+            '(?P<name>' + self.settings['varIdentifier'] + ')\\s*=>?\\s*(?P<val>.*?)(?:[;,]|$)',
+            line
+        )
+        if res:
+            return (res.group('name'), res.group('val').strip())
+
+        res = re.search(
+            '\\b(?:var|public|private|protected|static)\\s+(?P<name>' + self.settings['varIdentifier'] + ')',
+            line
+        )
+        if res:
+            return (res.group('name'), None)
+
+        return None
+
+    def guessTypeFromValue(self, val):
+        shortPrimitives = self.viewSettings.get('jsdocs_short_primitives') or False
+        if is_numeric(val):
+            return "float" if '.' in val else 'int' if shortPrimitives else 'integer'
+        if val[0] == '"' or val[0] == "'":
+            return "string"
+        if val[:5] == 'array' or (val[0] == '[' and val[-1] == ']'):
+            return "array"
+        if val.lower() in ('true', 'false', 'filenotfound'):
+            return 'bool' if shortPrimitives else 'boolean'
+        if val[:4] == 'new ':
+            res = re.search('new (' + self.settings['fnIdentifier'] + ')', val)
+            return res and res.group(1) or None
+        if val.lower() in ('null'):
+            return 'null'
+        return None
+
+    def getFunctionReturnType(self, name, retval):
+        shortPrimitives = self.viewSettings.get('jsdocs_short_primitives') or False
+        if (name[:2] == '__'):
+            if name in ('__construct', '__destruct', '__set', '__unset', '__wakeup'):
+                return None
+            if name == '__sleep':
+                return 'array'
+            if name == '__toString':
+                return 'string'
+            if name == '__isset':
+                return 'bool' if shortPrimitives else 'boolean'
+        return JsdocsParser.getFunctionReturnType(self, name, retval)
+
+
+class JsdocsCPP(JsdocsParser):
+    def setupSettings(self):
+        nameToken = '[a-zA-Z_][a-zA-Z0-9_]*'
+        identifier = '(%s)(::%s)?' % (nameToken, nameToken)
+        self.settings = {
+            'typeInfo': False,
+            'curlyTypes': False,
+            'typeTag': 'param',
+            'commentCloser': ' */',
+            'fnIdentifier': identifier,
+            'varIdentifier': '(' + identifier + ')\\s*(?:\\[(?:' + identifier + r')?\]|\((?:(?:\s*,\s*)?[a-z]+)+\s*\))*',
+            'fnOpener': identifier + '\\s+' + identifier + '\\s*\\(',
+            'bool': 'bool',
+            'function': 'function'
+        }
+
+    def parseFunction(self, line):
+        res = re.search(
+            '(?P<retval>' + self.settings['varIdentifier'] + ')[&*\\s]+'
+            + '(?P<name>' + self.settings['varIdentifier'] + ');?'
+            # void fnName
+            # (arg1, arg2)
+            + '\\s*\\(\\s*(?P<args>.*)\)',
+            line
+        )
+        if not res:
+            return None
+
+        return (res.group('name'), res.group('args'), res.group('retval'))
+
+    def parseArgs(self, args):
+        if args.strip() == 'void':
+            return []
+        return super(JsdocsCPP, self).parseArgs(args)
+
+    def getArgType(self, arg):
+        return None
+
+    def getArgName(self, arg):
+        return re.search(self.settings['varIdentifier'] + r"(?:\s*=.*)?$", arg).group(1)
+
+    def parseVar(self, line):
+        return None
+
+    def guessTypeFromValue(self, val):
+        return None
+
+    def getFunctionReturnType(self, name, retval):
+        return retval if retval != 'void' else None
+
+
+class JsdocsCoffee(JsdocsParser):
+    def setupSettings(self):
+        identifier = '[a-zA-Z_$][a-zA-Z_$0-9]*'
+        self.settings = {
+            # curly brackets around the type information
+            'curlyTypes': True,
+            'typeTag': self.viewSettings.get('jsdocs_override_js_var') or "type",
+            'typeInfo': True,
+            # technically, they can contain all sorts of unicode, but w/e
+            'varIdentifier': identifier,
+            'fnIdentifier': identifier,
+            'fnOpener': None,  # no multi-line function definitions for you, hipsters!
+            'commentCloser': '###',
+            'bool': 'Boolean',
+            'function': 'Function'
+        }
+
+    def parseFunction(self, line):
+        res = re.search(
+            #   fnName = function,  fnName : function
+            '(?:(?P<name>' + self.settings['varIdentifier'] + ')\s*[:=]\s*)?'
+            + '(?:\\((?P<args>[^()]*?)\\))?\\s*([=-]>)',
+            line
+        )
+        if not res:
+            return None
+
+        # grab the name out of "name1 = function name2(foo)" preferring name1
+        name = res.group('name') or ''
+        args = res.group('args')
+
+        return (name, args, None)
+
+    def parseVar(self, line):
+        res = re.search(
+            #   var foo = blah,
+            #       foo = blah;
+            #   baz.foo = blah;
+            #   baz = {
+            #        foo : blah
+            #   }
+
+            '(?P<name>' + self.settings['varIdentifier'] + ')\s*[=:]\s*(?P<val>.*?)(?:[;,]|$)',
+            line
+        )
+        if not res:
+            return None
+
+        return (res.group('name'), res.group('val').strip())
+
+    def guessTypeFromValue(self, val):
+        lowerPrimitives = self.viewSettings.get('jsdocs_lower_case_primitives') or False
+        if is_numeric(val):
+            return "number" if lowerPrimitives else "Number"
+        if val[0] == '"' or val[0] == "'":
+            return "string" if lowerPrimitives else "String"
+        if val[0] == '[':
+            return "Array"
+        if val[0] == '{':
+            return "Object"
+        if val == 'true' or val == 'false':
+            return "boolean" if lowerPrimitives else "Boolean"
+        if re.match('RegExp\\b|\\/[^\\/]', val):
+            return 'RegExp'
+        if val[:4] == 'new ':
+            res = re.search('new (' + self.settings['fnIdentifier'] + ')', val)
+            return res and res.group(1) or None
+        return None
+
+
+class JsdocsActionscript(JsdocsParser):
+
+    def setupSettings(self):
+        nameToken = '[a-zA-Z_][a-zA-Z0-9_]*'
+        self.settings = {
+            'typeInfo': False,
+            'curlyTypes': False,
+            'typeTag': '',
+            'commentCloser': ' */',
+            'fnIdentifier': nameToken,
+            'varIdentifier': '(%s)(?::%s)?' % (nameToken, nameToken),
+            'fnOpener': 'function(?:\\s+[gs]et)?(?:\\s+' + nameToken + ')?\\s*\\(',
+            'bool': 'bool',
+            'function': 'function'
+        }
+
+    def parseFunction(self, line):
+        res = re.search(
+            #   fnName = function,  fnName : function
+            '(?:(?P<name1>' + self.settings['varIdentifier'] + ')\s*[:=]\s*)?'
+            + 'function(?:\s+(?P<getset>[gs]et))?'
+            # function fnName
+            + '(?:\s+(?P<name2>' + self.settings['fnIdentifier'] + '))?'
+            # (arg1, arg2)
+            + '\s*\(\s*(?P<args>.*)\)',
+            line
+        )
+        if not res:
+            return None
+
+        name = res.group('name1') and re.sub(self.settings['varIdentifier'], r'\1', res.group('name1')) \
+            or res.group('name2') \
+            or ''
+
+        args = res.group('args')
+        options = {}
+        if res.group('getset') == 'set':
+            options['as_setter'] = True
+
+        return (name, args, None, options)
+
+    def parseVar(self, line):
+        return None
+
+    def getArgName(self, arg):
+        return re.sub(self.settings['varIdentifier'] + r'(\s*=.*)?', r'\1', arg)
+
+    def getArgType(self, arg):
+        # could actually figure it out easily, but it's not important for the documentation
+        return None
+
+
+class JsdocsObjC(JsdocsParser):
+
+    def setupSettings(self):
+        identifier = '[a-zA-Z_$][a-zA-Z_$0-9]*'
+        self.settings = {
+            # curly brackets around the type information
+            "curlyTypes": True,
+            'typeInfo': True,
+            "typeTag": "type",
+            # technically, they can contain all sorts of unicode, but w/e
+            "varIdentifier": identifier,
+            "fnIdentifier":  identifier,
+            "fnOpener": '^\s*[-+]',
+            "commentCloser": " */",
+            "bool": "Boolean",
+            "function": "Function"
+        }
+
+    def getDefinition(self, view, pos):
+        maxLines = 25  # don't go further than this
+
+        definition = ''
+        for i in range(0, maxLines):
+            line = read_line(view, pos)
+            if line is None:
+                break
+
+            pos += len(line) + 1
+            # strip comments
+            line = re.sub("//.*", "", line)
+            if definition == '':
+                if not self.settings['fnOpener'] or not re.search(self.settings['fnOpener'], line):
+                    definition = line
+                    break
+            definition += line
+            if line.find(';') > -1 or line.find('{') > -1:
+                definition = re.sub(r'\s*[;{]\s*$', '', definition)
+                break
+        return definition
+
+    def parseFunction(self, line):
+        # this is terrible, don't judge me
+
+        typeRE = r'[a-zA-Z_$][a-zA-Z0-9_$]*\s*\**'
+        res = re.search(
+            '[-+]\s+\\(\\s*(?P<retval>' + typeRE + ')\\s*\\)\\s*'
+            + '(?P<name>[a-zA-Z_$][a-zA-Z0-9_$]*)'
+            # void fnName
+            # (arg1, arg2)
+            + '\\s*(?::(?P<args>.*))?',
+            line
+        )
+        if not res:
+            return
+        name = res.group('name')
+        argStr = res.group('args')
+        args = []
+        if argStr:
+            groups = re.split('\\s*:\\s*', argStr)
+            numGroups = len(groups)
+            for i in range(0, numGroups):
+                group = groups[i]
+                if i < numGroups - 1:
+                    result = re.search(r'\s+(\S*)$', group)
+                    name += ':' + result.group(1)
+                    group = group[:result.start()]
+
+                args.append(group)
+
+            if (numGroups):
+                name += ':'
+        return (name, '|||'.join(args), res.group('retval'))
+
+    def parseArgs(self, args):
+        out = []
+        for arg in args.split('|||'):  # lol
+            lastParen = arg.rfind(')')
+            out.append((arg[1:lastParen], arg[lastParen + 1:]))
+        return out
+
+    def getFunctionReturnType(self, name, retval):
+        return retval if retval != 'void' and retval != 'IBAction' else None
+
+    def parseVar(self, line):
+        return None
+
+
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 class JsdocsJava(JsdocsParser):
     def setupSettings(self):
         identifier = '[a-zA-Z_$][a-zA-Z_$0-9]*'
@@ -771,6 +1344,35 @@ class JsdocsJava(JsdocsParser):
                 break
         return definition
 
+<<<<<<< HEAD
+=======
+class JsdocsRust(JsdocsParser):
+    def setupSettings(self):
+        self.settings = {
+            "curlyTypes": False,
+            'typeInfo': False,
+            "typeTag": False,
+            "varIdentifier": ".*",
+            "fnIdentifier":  ".*",
+            "fnOpener": "^\s*fn",
+            "commentCloser": " */",
+            "bool": "Boolean",
+            "function": "Function"
+        }
+
+    def parseFunction(self, line):
+        res = re.search('\s*fn\s+(?P<name>\S+)', line)
+        if not res:
+            return None
+
+        name = res.group('name').join('')
+
+        return (name, [])
+
+    def formatFunction(self, name, args):
+        return name
+
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
 ############################################################33
 
 
@@ -1006,3 +1608,91 @@ class JsdocsWrapLines(sublime_plugin.TextCommand):
 
         text = escape(text)
         write(v, text)
+<<<<<<< HEAD
+=======
+
+
+class JsdocsTypescript(JsdocsParser):
+
+    def setupSettings(self):
+        identifier = '[a-zA-Z_$][a-zA-Z_$0-9]*'
+        base_type_identifier = r'%s(\.%s)*(\[\])?' % ((identifier, ) * 2)
+        parametric_type_identifier = r'%s(\s*<\s*%s(\s*,\s*%s\s*)*>)?' % ((base_type_identifier, ) * 3)
+        self.settings = {
+            # curly brackets around the type information
+            "curlyTypes": True,
+            'typeInfo': True,
+            "typeTag": "type",
+            # technically, they can contain all sorts of unicode, but w/e
+            "varIdentifier": identifier,
+            "fnIdentifier": identifier,
+            "fnOpener": 'function(?:\\s+' + identifier + ')?\\s*\\(',
+            "commentCloser": " */",
+            "bool": "Boolean",
+            "function": "Function",
+            "functionRE":
+                # Modifiers
+                r'(?:public|private|static)?\s*'
+                # Method name
+                + r'(?P<name>' + identifier + r')\s*'
+                # Params
+                + r'\((?P<args>.*)\)\s*'
+                # Return value
+                + r'(:\s*(?P<retval>' + parametric_type_identifier + r'))?',
+            "varRE":
+                r'((public|private|static|var)\s+)?(?P<name>' + identifier
+                + r')\s*(:\s*(?P<type>' + parametric_type_identifier
+                + r'))?(\s*=\s*(?P<val>.*?))?([;,]|$)'
+        }
+        self.functionRE = re.compile(self.settings['functionRE'])
+        self.varRE = re.compile(self.settings['varRE'])
+
+    def parseFunction(self, line):
+        line = line.strip()
+        res = self.functionRE.search(line)
+
+        if not res:
+            return None
+        group_dict = res.groupdict()
+        return (group_dict["name"], group_dict["args"], group_dict["retval"])
+
+    def getArgType(self, arg):
+        if ':' in arg:
+            return arg.split(':')[-1].strip()
+        return None
+
+    def getArgName(self, arg):
+        if ':' in arg:
+            arg = arg.split(':')[0]
+        return arg.strip('[ \?]')
+
+    def parseVar(self, line):
+        res = self.varRE.search(line)
+        if not res:
+            return None
+        val = res.group('val')
+        if val: val = val.strip()
+        return (res.group('name'), val, res.group('type'))
+
+    def getFunctionReturnType(self, name, retval):
+        return retval if retval != 'void' else None
+
+    def guessTypeFromValue(self, val):
+        lowerPrimitives = self.viewSettings.get('jsdocs_lower_case_primitives') or False
+        if is_numeric(val):
+            return "number" if lowerPrimitives else "Number"
+        if val[0] == '"' or val[0] == "'":
+            return "string" if lowerPrimitives else "String"
+        if val[0] == '[':
+            return "Array"
+        if val[0] == '{':
+            return "Object"
+        if val == 'true' or val == 'false':
+            return "boolean" if lowerPrimitives else "Boolean"
+        if re.match('RegExp\\b|\\/[^\\/]', val):
+            return 'RegExp'
+        if val[:4] == 'new ':
+            res = re.search('new (' + self.settings['fnIdentifier'] + ')', val)
+            return res and res.group(1) or None
+        return None
+>>>>>>> 5eb8e09204190baa75e9a853dd45282e7b8e7a81
